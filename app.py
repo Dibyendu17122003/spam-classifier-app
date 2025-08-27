@@ -7,13 +7,16 @@ from nltk.stem.porter import PorterStemmer
 import os
 
 # ---------- FIX: Set NLTK data path for cloud deployment ----------
+
 nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
 os.makedirs(nltk_data_path, exist_ok=True)
 nltk.data.path.append(nltk_data_path)
 
 # ---------- Download NLTK Data ----------
+
 try:
     nltk.download('punkt', download_dir=nltk_data_path)
+    nltk.download('punkt_tab', download_dir=nltk_data_path)
     nltk.download('stopwords', download_dir=nltk_data_path)
 except Exception as e:
     st.error(f"NLTK download error: {e}")
