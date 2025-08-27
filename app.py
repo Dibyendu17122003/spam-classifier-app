@@ -4,11 +4,23 @@ import string
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
+import os
 
-nltk.download('punkt')
-nltk.download('stopwords')
+# ---------- FIX: Set NLTK data path for cloud deployment ----------
+nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
+os.makedirs(nltk_data_path, exist_ok=True)
+nltk.data.path.append(nltk_data_path)
+
+# ---------- Download NLTK Data ----------
+try:
+    nltk.download('punkt', download_dir=nltk_data_path)
+    nltk.download('stopwords', download_dir=nltk_data_path)
+except Exception as e:
+    st.error(f"NLTK download error: {e}")
+
 # Initialize stemmer
 ps = PorterStemmer()
+
 # ---------- Text Preprocessing ----------
 def transform_text(text):
     text = text.lower()
@@ -19,11 +31,14 @@ def transform_text(text):
     text = [ps.stem(i) for i in text]
     
     return " ".join(text)
+
 # ---------- Load Model & Vectorizer ----------
 tfidf = pickle.load(open('CountVectorizer.pkl','rb'))
 model = pickle.load(open('model.pkl','rb'))
+
 # ---------- Page Config ----------
 st.set_page_config(page_title="Spam Classifier", page_icon="📩", layout="wide")
+
 # ---------- Modern CSS ----------
 st.markdown("""
     <style>
@@ -158,6 +173,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 # ---------- Sidebar ----------
 with st.sidebar:
     st.markdown("<h2 class='sidebar-title'>📌 Project Details</h2>", unsafe_allow_html=True)
@@ -172,9 +188,11 @@ with st.sidebar:
         """, 
         unsafe_allow_html=True
     )
+
 # ---------- Main Layout ----------
 st.markdown("<h1 class='title'>📩 Ultra Modern Spam Classifier</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitle'>Zero Spam. Maximum Inbox Clarity. Always ✨</p>", unsafe_allow_html=True)
+
 with st.container():
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
     
