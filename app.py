@@ -5,6 +5,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from collections import deque
+# ---------- FIX: Set NLTK data path for cloud deployment ----------
+
+nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
+os.makedirs(nltk_data_path, exist_ok=True)
+nltk.data.path.append(nltk_data_path)
 
 # -------------------- Load Model --------------------
 model = joblib.load("model.pkl")
