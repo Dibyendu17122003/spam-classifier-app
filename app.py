@@ -1,244 +1,218 @@
 import streamlit as st
-import joblib
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from collections import deque
+import pickle
+import string
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+import os
 
-# -------------------- Load Model --------------------
-model = joblib.load("model.pkl")
-vectorizer = joblib.load("CountVectorizer.pkl")
+# ---------- FIX: Set NLTK data path for cloud deployment ----------
 
-# -------------------- Session State --------------------
-if "history" not in st.session_state:
-    st.session_state.history = deque(maxlen=5)
+nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
+os.makedirs(nltk_data_path, exist_ok=True)
+nltk.data.path.append(nltk_data_path)
 
-# -------------------- Page Config --------------------
-st.set_page_config(page_title="Spam Detector", page_icon="📩", layout="wide")
+# ---------- Download NLTK Data ----------
 
-# -------------------- Ultra-Modern CSS --------------------
+try:
+    nltk.download('punkt', download_dir=nltk_data_path)
+    nltk.download('punkt_tab', download_dir=nltk_data_path)
+    nltk.download('stopwords', download_dir=nltk_data_path)
+except Exception as e:
+    st.error(f"NLTK download error: {e}")
+
+# Initialize stemmer
+ps = PorterStemmer()
+
+# ---------- Text Preprocessing ----------
+def transform_text(text):
+    text = text.lower()
+    text = nltk.word_tokenize(text)
+    
+    y = [i for i in text if i.isalnum()]
+    text = [i for i in y if i not in stopwords.words('english') and i not in string.punctuation]
+    text = [ps.stem(i) for i in text]
+    
+    return " ".join(text)
+
+# ---------- Load Model & Vectorizer ----------
+tfidf = pickle.load(open('CountVectorizer.pkl','rb'))
+model = pickle.load(open('model.pkl','rb'))
+
+# ---------- Page Config ----------
+st.set_page_config(page_title="Spam Classifier", page_icon="📩", layout="wide")
+
+# ---------- Modern CSS ----------
 st.markdown("""
-<style>
-/* App Background */
-.stApp {
-    background: linear-gradient(135deg, #0f0f1a, #1a1a2e, #222244);
-    font-family: 'Segoe UI', sans-serif;
-    color: #fff;
-}
-
-/* Title Animation */
-h1 {
-    font-size: 2.8rem !important;
-    text-align: center;
-    background: linear-gradient(90deg, #ff4dff, #00e6e6, #7d5fff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: glow 3s ease-in-out infinite alternate;
-}
-@keyframes glow {
-    from { text-shadow: 0 0 10px #ff4dff; }
-    to { text-shadow: 0 0 30px #00e6e6, 0 0 50px #7d5fff; }
-}
-
-/* Subtitle */
-h2, h3 {
-    text-shadow: 0 0 15px rgba(0,255,255,0.3);
-    color: #bb86fc !important;
-}
-
-/* Buttons */
-button[kind="primary"] {
-    background: linear-gradient(45deg, #7d5fff, #00e6e6);
-    border: none;
-    border-radius: 12px;
-    padding: 10px 22px;
-    font-weight: bold;
-    color: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    transition: all 0.3s ease-in-out;
-}
-button[kind="primary"]:hover {
-    transform: scale(1.08);
-    box-shadow: 0 0 20px rgba(0,255,255,0.6);
-}
-
-/* Text Area */
-textarea {
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    background: rgba(255,255,255,0.05) !important;
-    color: #fff !important;
-    padding: 12px !important;
-    transition: 0.3s;
-}
-textarea:focus {
-    outline: none !important;
-    border: 1px solid #00e6e6 !important;
-    box-shadow: 0 0 15px #00e6e6;
-}
-
-/* History Cards */
-.custom-card {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 16px;
-    padding: 14px 20px;
-    margin-bottom: 14px;
-    backdrop-filter: blur(12px);
-    animation: fadeIn 0.6s ease;
-    transition: transform 0.25s ease, background 0.3s ease;
-}
-.custom-card:hover {
-    transform: translateY(-4px) scale(1.02);
-    background: rgba(255,255,255,0.15);
-    box-shadow: 0 0 20px rgba(0,255,255,0.25);
-}
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px);}
-    to { opacity: 1; transform: translateY(0);}
-}
-
-/* Labels */
-.msg-label { color: #87CEFA; font-size: 15px; }
-.spam-label { color: #ff4c4c; font-weight: bold; font-size: 15px; text-shadow: 0 0 10px #ff1a1a; }
-.ham-label { color: #00ff99; font-weight: bold; font-size: 15px; text-shadow: 0 0 10px #00ff99; }
-.confidence-label { color: #bb86fc; font-size: 14px; text-shadow: 0 0 5px #bb86fc; }
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: rgba(20,20,40,0.9);
-    backdrop-filter: blur(15px);
-    border-right: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 0 15px rgba(187,134,252,0.3);
-}
-</style>
+    <style>
+    /* Background gradient animation */
+    body {
+        background: linear-gradient(270deg, #c3e0ff, #d5c6ff, #b2cfff, #e0ccff);
+        background-size: 800% 800%;
+        animation: gradientFlow 18s ease infinite;
+    }
+    @keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    /* Main card */
+    .main-card {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 40px;
+        border-radius: 20px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+        text-align: center;
+        animation: slideUp 1.2s ease;
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(40px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    /* Title */
+    .title {
+        font-size: 42px;
+        font-weight: 800;
+        background: linear-gradient(90deg, #6a5acd, #00bfff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0px 0px 10px rgba(106,90,205,0.3);
+        transition: transform 0.3s ease;
+    }
+    .title:hover {
+        transform: scale(1.05);
+        text-shadow: 0px 0px 20px rgba(106,90,205,0.6);
+    }
+    /* Subtitle */
+    .subtitle {
+        font-size: 18px;
+        color: #333;
+        margin-bottom: 25px;
+    }
+    /* Input */
+    .stTextInput>div>div>input {
+        border-radius: 12px;
+        border: 2px solid #9b8cff;
+        padding: 14px;
+        font-size: 16px;
+        transition: all 0.3s ease;
+    }
+    .stTextInput>div>div>input:focus {
+        border: 2px solid #6a5acd;
+        box-shadow: 0px 0px 12px rgba(106,90,205,0.5);
+    }
+    /* Button */
+    .stButton>button {
+        background: linear-gradient(90deg, #89c4f4, #a89df7);
+        color: white;
+        font-weight: bold;
+        border-radius: 12px;
+        padding: 12px 22px;
+        border: none;
+        transition: all 0.3s ease;
+        font-size: 17px;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(90deg, #72b3f6, #917ef6);
+        transform: translateY(-4px) scale(1.03);
+        box-shadow: 0 8px 22px rgba(0,0,0,0.25);
+    }
+    .stButton>button::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.3);
+        transition: 0.5s;
+    }
+    .stButton>button:hover::after {
+        left: 100%;
+    }
+    /* Results */
+    .result-spam {
+        font-size: 26px;
+        font-weight: bold;
+        color: #ff4c4c;
+        text-shadow: 0 0 15px rgba(255,76,76,0.7);
+        animation: pulse 1.5s infinite;
+    }
+    .result-notspam {
+        font-size: 26px;
+        font-weight: bold;
+        color: #3cb371;
+        text-shadow: 0 0 15px rgba(60,179,113,0.6);
+        animation: fadeIn 2s;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+        100% { transform: scale(1); }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    /* Sidebar custom styling */
+    [data-testid="stSidebar"] {
+        background: rgba(255,255,255,0.6);
+        backdrop-filter: blur(12px);
+        border-right: 2px solid rgba(106,90,205,0.3);
+    }
+    .sidebar-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #5a3dd1;
+    }
+    .sidebar-text {
+        font-size: 16px;
+        color: #333;
+        line-height: 1.6;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
-# -------------------- Header --------------------
-st.title("📩 Spam / Ham Classifier")
-st.caption("✨ Ultra-modern AI-powered SMS & Email Spam Detection ✨")
-
-# -------------------- Input --------------------
-msg = st.text_area("✍️ Enter a message to classify:", height=120)
-
-col1, col2 = st.columns([1, 4])
-with col1:
-    if st.button("⚖️ Classify"):
-        if msg.strip():
-            X = vectorizer.transform([msg])
-            prediction = model.predict(X)[0]
-            prob = model.predict_proba(X)[0]
-
-            label = "Spam" if prediction == 1 else "Ham"
-            confidence = np.max(prob) * 100
-
-            # Save to history
-            st.session_state.history.appendleft({
-                "Message": msg,
-                "Prediction": label,
-                "Confidence": f"{confidence:.2f}%"
-            })
-
-            if label == "Spam":
-                st.error(f"🔥 **Spam detected!** {confidence:.2f}% confident")
-            else:
-                st.success(f"🌱 **Ham detected!** {confidence:.2f}% confident")
-        else:
-            st.warning("⚠️ Please enter a message!")
-
-# -------------------- History --------------------
-st.markdown("## 📜 Classified Messages")
-
-if st.session_state.history:
-    for i, entry in enumerate(st.session_state.history):
-        st.markdown(f"""
-            <div class="custom-card">
-                <p style="margin:0; color:#ccc; font-size:13px;">#{i+1}</p>
-                <p class="msg-label"><b>📩 Message:</b> {entry['Message']}</p>
-                <p class="{ 'spam-label' if entry['Prediction']=='Spam' else 'ham-label'}">
-                    <b>🔍 Prediction:</b> {entry['Prediction']}
-                </p>
-                <p class="confidence-label"><b>📊 Confidence:</b> {entry['Confidence']}</p>
-            </div>
-        """, unsafe_allow_html=True)
-else:
-    st.info("🚫 No history yet. Try classifying a message!")
-
-# -------------------- Detailed Analysis --------------------
-st.markdown("## 🔬 Detailed Analysis of Last Message")
-if st.session_state.history:
-    last_entry = st.session_state.history[0]
-    X_last = vectorizer.transform([last_entry["Message"]])
-    probs = model.predict_proba(X_last)[0]
-
-    colA, colB = st.columns(2)
-
-    with colA:
-        fig_pie = go.Figure(data=[go.Pie(
-            labels=["Ham", "Spam"],
-            values=probs,
-            hole=0.5,
-            marker=dict(colors=["#00ff99", "#ff4c4c"]),
-            textinfo="label+percent",
-            pull=[0.05, 0]
-        )])
-        fig_pie.update_layout(title_text="Spam vs Ham Probability", title_x=0.5)
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with colB:
-        fig_bar = px.bar(
-            x=["Ham", "Spam"],
-            y=probs,
-            text=[f"{p:.2f}" for p in probs],
-            color=["Ham", "Spam"],
-            color_discrete_map={"Ham": "#00ff99", "Spam": "#ff4c4c"}
-        )
-        fig_bar.update_traces(textposition="outside", marker=dict(line=dict(width=1, color="black")))
-        fig_bar.update_layout(
-            yaxis=dict(range=[0, 1]),
-            title_text="Confidence Distribution",
-            title_x=0.5
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-# -------------------- Description --------------------
-st.markdown("## 📚 Description")
-
-st.write("""
-### 💀 Spam is Dangerous  
-- 📩 Spam emails and messages can flood inboxes, reducing productivity.  
-- 🦠 Many contain **malware, ransomware, or viruses** disguised as harmless files.  
-- 🎭 Often used for **phishing attacks**, tricking users into sharing passwords or banking details.  
-- 💸 Can lead to **financial loss, identity theft, and data breaches**.  
-
-### 🔖 Why Classify Spam?  
-- ✅ Protects users from **fraudulent activities and scams**.  
-- 📊 Improves **email and chat system efficiency** by filtering junk.  
-- 👨‍💻 Builds **trust in digital communication** by keeping it clean.  
-- ⚡ Enables organizations to **save time and resources** wasted on spam.  
-
-### 💡⭐ Why Our Web App?  
-- 🤖 **ML-Powered Detection**: Uses advanced machine learning & NLP models for accuracy.  
-- 🕒 **Real-Time Classification**: Instantly separates spam from genuine messages.  
-- 💻 **User-Friendly Interface**: Clean, modern, and responsive for all devices.  
-- 🔍 **Interactive Dashboard**: Provides insights, charts, and spam trends analysis.  
-- 🌐 **Secure & Scalable**: Designed for personal use, enterprises, and educational purposes.  
-""")
-
-# -------------------- About --------------------
+# ---------- Sidebar ----------
 with st.sidebar:
-    st.markdown("## 📌 Project Details")
-    st.markdown("""
-    ### 📋 **Project**  
-    SMS / Email Spam Classifier  
+    st.markdown("<h2 class='sidebar-title'>📌 Project Details</h2>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <p class='sidebar-text'>
+        🚀 <b>Project:</b> SMS/Email Spam Classifier <br><br>
+        🧠 <b>Model:</b> Trained on spam & ham dataset using NLP preprocessing + ML <br><br>
+        🎯 <b>Goal:</b> Detect spam messages with accuracy and speed <br><br>
+        👨‍💻 <b>Designed & Trained by:</b> <span style="color:#6a5acd;font-weight:bold;">Dibyendu</span>
+        </p>
+        """, 
+        unsafe_allow_html=True
+    )
 
-    ### 🤖 **Model**  
-    Trained on spam & ham dataset using NLP preprocessing + ML  
+# ---------- Main Layout ----------
+st.markdown("<h1 class='title'>📩 Ultra Modern Spam Classifier</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Zero Spam. Maximum Inbox Clarity. Always ✨</p>", unsafe_allow_html=True)
 
-    ### 🎯 **Goal**  
-    Detect spam messages with accuracy and speed  
-
-    ### 👨‍💻 **Designed & Trained by**  
-    Dibyendu Karmahapatra  
-    """)
+with st.container():
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    
+    input_sms = st.text_input("✍ Enter the Email or SMS to check", "")
+    if st.button('🔮 Predict Message'):
+        if input_sms.strip() == "":
+            st.warning("⚠ Please enter some text first!")
+        else:
+            # Preprocess
+            transformed_sms = transform_text(input_sms)
+            # Vectorize
+            vector_input = tfidf.transform([transformed_sms])
+            # Predict
+            result = model.predict(vector_input)[0]
+            # Display result
+            if result == 1:
+                st.markdown("<p class='result-spam'>🚨 Spam Message Detected!</p>", unsafe_allow_html=True)
+            else:
+                st.markdown("<p class='result-notspam'>✅ This message is Safe</p>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
